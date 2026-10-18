@@ -27,6 +27,7 @@ const receiptViewerCaption = document.querySelector("#receipt-viewer-title");
 let backup = null;
 let addedRecords = 0;
 let pendingReceiptImage = null;
+let receiptViewerTrigger = null;
 let language = "ja";
 let currencySymbol = "¥";
 let moneyFormatter = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 });
@@ -53,9 +54,12 @@ recordTypePicker.addEventListener("change", populateRecordCategories);
 recordForm.addEventListener("submit", addRecord);
 document.querySelector("#export-backup-button").addEventListener("click", downloadUpdatedBackup);
 receiptPhotoInput.addEventListener("change", updateReceiptPreview);
-document.querySelector("#close-receipt-viewer").addEventListener("click", () => receiptViewer.close());
+document.querySelector("#close-receipt-viewer").addEventListener("click", closeReceiptViewer);
 receiptViewer.addEventListener("click", event => {
-  if (event.target === receiptViewer) receiptViewer.close();
+  if (event.target === receiptViewer) closeReceiptViewer();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !receiptViewer.hidden) closeReceiptViewer();
 });
 
 window.addEventListener("DOMContentLoaded", initializeApp, { once: true });
@@ -502,7 +506,7 @@ function renderRecords(records) {
       thumbnail.src = `data:image/jpeg;base64,${receiptData}`;
       thumbnail.alt = "";
       symbol.append(thumbnail);
-      symbol.addEventListener("click", () => openReceiptViewer(receiptData, record, date));
+      symbol.addEventListener("click", () => openReceiptViewer(receiptData, record, date, symbol));
     } else {
       symbol = document.createElement("div");
       symbol.className = `record-symbol ${type}`;
@@ -532,10 +536,21 @@ function renderRecords(records) {
   }
 }
 
-function openReceiptViewer(imageData, record, date) {
+function openReceiptViewer(imageData, record, date, trigger) {
   receiptViewerImage.src = `data:image/jpeg;base64,${imageData}`;
   receiptViewerCaption.textContent = `${dateLabel(date)} · ${record.memo?.trim() || categoryName(record)} · ${formatMoney(record.amount)}`;
-  receiptViewer.showModal();
+  receiptViewerTrigger = trigger;
+  receiptViewer.hidden = false;
+  document.body.style.overflow = "hidden";
+  document.querySelector("#close-receipt-viewer").focus();
+}
+
+function closeReceiptViewer() {
+  receiptViewer.hidden = true;
+  receiptViewerImage.removeAttribute("src");
+  document.body.style.overflow = "";
+  if (receiptViewerTrigger?.isConnected) receiptViewerTrigger.focus();
+  receiptViewerTrigger = null;
 }
 
 function receiptImageBase64(fileName) {
