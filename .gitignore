@@ -1,0 +1,9 @@
+# 家計データを含むバックアップは公開リポジトリへ追加しない
+*-Backup-*.json
+DailyKakeibo-Backup*.json
+backup*.json
+*.kakeibobackup
+
+# OS / editor files
+.DS_Store
+.vscode/
