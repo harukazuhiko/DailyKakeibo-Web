@@ -67,6 +67,44 @@
           </article>
         </div>
 
+        <section class="panel entry-panel">
+          <div class="panel-heading">
+            <div><p class="eyebrow">NEW ACTIVITY</p><h2>記録を追加</h2></div>
+          </div>
+          <form id="record-form" class="record-form">
+            <label class="form-field">
+              <span>種類</span>
+              <select id="record-type" required>
+                <option value="expense">支出</option>
+                <option value="income">収入</option>
+              </select>
+            </label>
+            <label class="form-field">
+              <span>日付</span>
+              <input id="record-date" type="date" required>
+            </label>
+            <label class="form-field">
+              <span>カテゴリー</span>
+              <select id="record-category" required></select>
+            </label>
+            <label class="form-field">
+              <span>金額</span>
+              <input id="record-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="例：1200" required>
+            </label>
+            <label class="form-field memo-field">
+              <span>メモ（任意）</span>
+              <input id="record-memo" type="text" maxlength="120" placeholder="例：昼食">
+            </label>
+            <button id="add-record-button" class="add-record-button" type="submit">記録を追加</button>
+          </form>
+          <p id="category-hint" class="form-hint" hidden></p>
+          <div id="backup-export-panel" class="backup-export-panel" hidden>
+            <p><strong id="added-record-count"></strong>を追加しました。iPhoneへ反映する場合は、更新したバックアップを保存してアプリで復元してください。</p>
+            <p class="restore-warning">復元すると、iPhone内の記録・設定などはこのバックアップの内容に置き換わります。復元前に、iPhone側の最新バックアップを保存してください。</p>
+            <button id="export-backup-button" class="export-backup-button" type="button">更新したバックアップを保存</button>
+          </div>
+        </section>
+
         <div class="content-grid">
           <section class="panel category-panel">
             <div class="panel-heading">

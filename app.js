@@ -6,8 +6,18 @@ const emptyState = document.querySelector("#empty-state");
 const dashboard = document.querySelector("#dashboard");
 const errorBox = document.querySelector("#load-error");
 const monthPicker = document.querySelector("#month-picker");
+const recordForm = document.querySelector("#record-form");
+const recordTypePicker = document.querySelector("#record-type");
+const recordDateInput = document.querySelector("#record-date");
+const recordCategoryPicker = document.querySelector("#record-category");
+const recordAmountInput = document.querySelector("#record-amount");
+const recordMemoInput = document.querySelector("#record-memo");
+const categoryHint = document.querySelector("#category-hint");
+const backupExportPanel = document.querySelector("#backup-export-panel");
+const addedRecordCount = document.querySelector("#added-record-count");
 
 let backup = null;
+let addedRecords = 0;
 let language = "ja";
 let currencySymbol = "¥";
 let moneyFormatter = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 });
@@ -20,6 +30,8 @@ fileInput.addEventListener("change", async () => {
     const parsed = JSON.parse(await file.text());
     validateBackup(parsed);
     backup = parsed;
+    addedRecords = 0;
+    backupExportPanel.hidden = true;
     language = parsed.settings?.language === "english" ? "en" : "ja";
     currencySymbol = typeof parsed.settings?.currencySymbol === "string" ? parsed.settings.currencySymbol : "¥";
     moneyFormatter = new Intl.NumberFormat(language === "ja" ? "ja-JP" : "en-US", {
@@ -30,6 +42,8 @@ fileInput.addEventListener("change", async () => {
     emptyState.hidden = true;
     dashboard.hidden = false;
     populateMonths();
+    populateRecordCategories();
+    setDefaultRecordDate();
     renderMonth();
   } catch (error) {
     showError(error instanceof Error ? error.message : "JSONファイルを読み込めませんでした。");
@@ -39,6 +53,9 @@ fileInput.addEventListener("change", async () => {
 });
 
 monthPicker.addEventListener("change", renderMonth);
+recordTypePicker.addEventListener("change", populateRecordCategories);
+recordForm.addEventListener("submit", addRecord);
+document.querySelector("#export-backup-button").addEventListener("click", downloadUpdatedBackup);
 
 function validateBackup(value) {
   if (!value || typeof value !== "object" || !Array.isArray(value.records)) {
@@ -103,6 +120,110 @@ function populateMonths() {
     }).format(new Date(year, month - 1, 1));
     monthPicker.append(option);
   });
+}
+
+function populateRecordCategories() {
+  if (!backup) return;
+  const selectedType = recordTypePicker.value;
+  const categories = backup.categories
+    .filter(category => category.type === selectedType && !category.isHidden)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+  recordCategoryPicker.replaceChildren();
+  categories.forEach(category => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.localizedNames?.[language]
+      || category.localizedNames?.ja
+      || category.localizedNames?.en
+      || (language === "ja" ? "その他" : "Other");
+    recordCategoryPicker.append(option);
+  });
+
+  const hasCategories = categories.length > 0;
+  recordCategoryPicker.disabled = !hasCategories;
+  document.querySelector("#add-record-button").disabled = !hasCategories;
+  categoryHint.hidden = hasCategories;
+  categoryHint.textContent = hasCategories
+    ? ""
+    : "この種類で選べるカテゴリーがありません。iPhoneアプリでカテゴリーを確認し、最新のバックアップを読み込んでください。";
+}
+
+function setDefaultRecordDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  recordDateInput.value = `${year}-${month}-${day}`;
+}
+
+function addRecord(event) {
+  event.preventDefault();
+  if (!backup || !recordForm.reportValidity()) return;
+
+  const category = backup.categories.find(item =>
+    item.id === recordCategoryPicker.value && item.type === recordTypePicker.value && !item.isHidden
+  );
+  const amount = Number(recordAmountInput.value);
+  if (!category || !Number.isFinite(amount) || amount <= 0) return;
+
+  const [year, month, day] = recordDateInput.value.split("-").map(Number);
+  const recordDate = new Date(year, month - 1, day, 12, 0, 0);
+  if (Number.isNaN(recordDate.getTime())) return;
+
+  const now = new Date();
+  const appleSeconds = date => date.getTime() / 1000 - APPLE_EPOCH_OFFSET;
+  backup.records.push({
+    id: createUUID(),
+    type: recordTypePicker.value,
+    date: appleSeconds(recordDate),
+    categoryId: category.id,
+    categoryNameSnapshot: category.localizedNames?.[language]
+      || category.localizedNames?.ja
+      || category.localizedNames?.en
+      || "",
+    amount,
+    memo: recordMemoInput.value.trim(),
+    receiptImagePath: null,
+    createdAt: appleSeconds(now),
+    updatedAt: appleSeconds(now)
+  });
+
+  addedRecords += 1;
+  addedRecordCount.textContent = `${addedRecords}件の記録`;
+  backupExportPanel.hidden = false;
+  document.querySelector("#backup-label").textContent = `読み込み済み · ${addedRecords}件追加`;
+  populateMonths();
+  monthPicker.value = periodKey(recordDate);
+  renderMonth();
+  recordAmountInput.value = "";
+  recordMemoInput.value = "";
+  recordAmountInput.focus();
+}
+
+function createUUID() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, character => {
+    const value = Math.floor(Math.random() * 16);
+    return (character === "x" ? value : (value & 0x3) | 0x8).toString(16);
+  });
+}
+
+function downloadUpdatedBackup() {
+  if (!backup || addedRecords === 0) return;
+
+  backup.exportedAt = new Date().getTime() / 1000 - APPLE_EPOCH_OFFSET;
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const date = new Date();
+  const datePart = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+  anchor.href = url;
+  anchor.download = `DailyKakeibo-Backup-${datePart}-web.json`;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function renderMonth() {

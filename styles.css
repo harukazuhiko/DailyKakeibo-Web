@@ -49,6 +49,20 @@ h1 { font-size: clamp(26px, 4vw, 34px); letter-spacing: -.055em; line-height: 1.
 select { appearance: none; border: 1px solid #e5e6df; background: white; border-radius: 8px; color: var(--ink); padding: 9px 31px 9px 11px; font-size: 12px; font-weight: 600; background-image: linear-gradient(45deg, transparent 50%, #7e8981 50%), linear-gradient(135deg, #7e8981 50%, transparent 50%); background-position: calc(100% - 14px) 14px, calc(100% - 10px) 14px; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat; }
 .summary-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 13px; }
 .summary-card, .panel { border: 1px solid var(--line); background: var(--card); border-radius: 14px; }
+.entry-panel { margin-top: 13px; }
+.entry-panel .panel-heading { margin-bottom: 14px; }
+.record-form { display: grid; grid-template-columns: .8fr 1fr 1.4fr 1fr 1.6fr auto; align-items: end; gap: 10px; }
+.form-field { display: grid; gap: 7px; color: #727c75; font-size: 10px; }
+.form-field input, .form-field select { width: 100%; min-width: 0; min-height: 40px; border: 1px solid #e5e6df; border-radius: 8px; background-color: white; color: var(--ink); padding: 9px 10px; font: inherit; font-size: 12px; }
+.form-field select { padding-right: 28px; }
+.add-record-button, .export-backup-button { cursor: pointer; min-height: 40px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: white; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.add-record-button:hover, .export-backup-button:hover { background: #2b684a; }
+.add-record-button:disabled { cursor: not-allowed; background: #aeb8b0; }
+.form-hint { margin: 12px 0 0; color: #9b604d; font-size: 11px; line-height: 1.6; }
+.backup-export-panel { margin-top: 15px; padding: 14px; border: 1px solid #dce9de; border-radius: 10px; background: #f5f9f5; color: #56665a; font-size: 11px; line-height: 1.7; }
+.backup-export-panel p { margin: 0 0 8px; }
+.backup-export-panel .restore-warning { color: #976148; }
+.backup-export-panel .export-backup-button { margin-top: 3px; }
 .summary-card { min-height: 137px; padding: 19px 20px 16px; }
 .balance-card { background: #f0f5f0; border-color: #e5ede5; }
 .card-label { display: flex; align-items: center; gap: 8px; color: #727c75; font-size: 11px; font-weight: 500; }
@@ -104,6 +118,11 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
   .loaded-file { width: 100%; flex-basis: 100%; margin-bottom: 3px; }
   .month-picker-label { margin-right: auto; }
   .summary-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
+  .entry-panel { margin-top: 10px; }
+  .record-form { grid-template-columns: 1fr 1fr; gap: 11px 9px; }
+  .memo-field { grid-column: 1 / -1; }
+  .add-record-button { grid-column: 1 / -1; width: 100%; }
+  .backup-export-panel { padding: 13px; }
   .summary-card { min-height: 118px; padding: 15px 14px 13px; }
   .balance-card { grid-column: 1 / -1; min-height: 126px; }
   .summary-value { margin-top: 12px; font-size: 23px; }
