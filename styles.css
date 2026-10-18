@@ -52,6 +52,8 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
 .summary-card, .panel { border: 1px solid var(--line); background: var(--card); border-radius: 14px; }
 .entry-panel { margin-top: 13px; }
 .entry-panel .panel-heading { margin-bottom: 14px; }
+.cancel-edit-button { border: 1px solid #dfe5df; border-radius: 8px; padding: 8px 11px; background: white; color: #68756b; font: inherit; font-size: 11px; cursor: pointer; }
+.cancel-edit-button:hover { background: #f5f7f3; }
 .record-form { display: grid; grid-template-columns: .8fr 1fr 1.4fr 1fr 1.6fr 1.3fr auto; align-items: end; gap: 10px; }
 .form-field { display: grid; gap: 7px; color: #727c75; font-size: 10px; }
 .form-field input, .form-field select { width: 100%; min-width: 0; min-height: 40px; border: 1px solid #e5e6df; border-radius: 8px; background-color: white; color: var(--ink); padding: 9px 10px; font: inherit; font-size: 12px; }
@@ -63,6 +65,7 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
 .add-record-button, .export-backup-button { cursor: pointer; min-height: 40px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: white; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .add-record-button:hover, .export-backup-button:hover { background: #2b684a; }
 .add-record-button:disabled { cursor: not-allowed; background: #aeb8b0; }
+.export-backup-button:disabled { cursor: not-allowed; background: #aeb8b0; }
 .form-hint { margin: 12px 0 0; color: #9b604d; font-size: 11px; line-height: 1.6; }
 .backup-export-panel { margin-top: 15px; padding: 14px; border: 1px solid #dce9de; border-radius: 10px; background: #f5f9f5; color: #56665a; font-size: 11px; line-height: 1.7; }
 .backup-export-panel p { margin: 0 0 8px; }
@@ -100,7 +103,7 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
 .report-stat strong { color: var(--ink); font-size: 11px; }
 .records-panel { margin-top: 13px; padding-bottom: 6px; }
 .records-heading { margin-bottom: 5px; }
-.record-row { min-height: 58px; display: grid; grid-template-columns: 35px minmax(0, 1fr) auto; align-items: center; gap: 11px; border-top: 1px solid #f1f1ec; }
+.record-row { min-height: 58px; display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 11px; border-top: 1px solid #f1f1ec; }
 .record-symbol { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: #f5f4ef; color: #7d867e; font-size: 13px; }
 .record-symbol.income { background: var(--green-soft); color: var(--green); }
 .record-symbol.expense { background: var(--orange-soft); color: var(--orange); }
@@ -114,11 +117,26 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
 .close-receipt-viewer { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 1px solid #ffffff3b; border-radius: 50%; background: #ffffff14; color: white; cursor: pointer; font-size: 24px; line-height: 1; }
 .receipt-viewer-image { display: block; max-width: 100%; max-height: calc(92dvh - 70px); margin: 0 auto; border-radius: 8px; object-fit: contain; }
 .record-main { min-width: 0; }
+.record-detail-trigger { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 2px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.record-detail-trigger:hover .record-title { color: var(--green); }
+.record-detail-trigger:focus-visible, .close-record-detail:focus-visible, .record-detail-edit:focus-visible, .cancel-edit-button:focus-visible { outline: 2px solid #8fc19c; outline-offset: 3px; }
+.record-copy { min-width: 0; }
 .record-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #404842; font-size: 11px; font-weight: 600; }
 .record-subtitle { margin-top: 4px; color: #a0a69f; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .record-amount { text-align: right; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .record-amount.income { color: var(--green); }
 .record-empty { padding: 24px 0; color: #a0a69f; font-size: 12px; text-align: center; }
+.record-detail-viewer { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: #121713bb; backdrop-filter: blur(3px); }
+.record-detail-card { width: min(100%, 480px); max-height: 90dvh; overflow-y: auto; padding: 23px; border: 1px solid #e9ebe6; border-radius: 16px; background: white; color: var(--ink); box-shadow: 0 20px 70px #0003; }
+.record-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.record-detail-header .eyebrow { margin: 0 0 5px; }
+.record-detail-header h2 { margin: 0; font-size: 19px; }
+.close-record-detail { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border: 1px solid #e4e8e2; border-radius: 50%; background: white; color: #68756b; cursor: pointer; font-size: 24px; line-height: 1; }
+.record-detail-fields { margin: 0 0 19px; }
+.record-detail-row { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; padding: 13px 0; border-top: 1px solid #f0f1ed; font-size: 13px; }
+.record-detail-row dt { color: #89918a; }
+.record-detail-row dd { margin: 0; color: #3e4740; font-weight: 600; overflow-wrap: anywhere; }
+.record-detail-edit { width: 100%; }
 .privacy-footer { display: flex; gap: 7px; align-items: center; justify-content: center; color: #9ca39c; font-size: 10px; padding: 18px 5px 0; }
 .lock-icon { font-size: 14px; color: #7e9c84; }
 .notice { margin: 0 0 14px; border-radius: 9px; padding: 12px 14px; font-size: 12px; line-height: 1.6; }
@@ -154,4 +172,5 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
   .privacy-footer { align-items: start; text-align: left; justify-content: flex-start; font-size: 9px; line-height: 1.6; }
   .receipt-viewer-content { width: calc(100vw - 20px); max-height: 92dvh; padding: 9px; }
   .receipt-viewer-image { max-height: calc(92dvh - 65px); }
+  .record-detail-card { padding: 19px; }
 }

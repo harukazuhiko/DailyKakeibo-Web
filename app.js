@@ -16,6 +16,7 @@ const recordAmountInput = document.querySelector("#record-amount");
 const recordMemoInput = document.querySelector("#record-memo");
 const categoryHint = document.querySelector("#category-hint");
 const backupExportPanel = document.querySelector("#backup-export-panel");
+const exportBackupButton = document.querySelector("#export-backup-button");
 const addedRecordCount = document.querySelector("#added-record-count");
 const receiptPhotoInput = document.querySelector("#receipt-photo");
 const receiptPreview = document.querySelector("#receipt-preview");
@@ -23,11 +24,16 @@ const saveStatus = document.querySelector("#save-status");
 const receiptViewer = document.querySelector("#receipt-viewer");
 const receiptViewerImage = document.querySelector("#receipt-viewer-image");
 const receiptViewerCaption = document.querySelector("#receipt-viewer-title");
+const recordDetailViewer = document.querySelector("#record-detail-viewer");
+const recordDetailFields = document.querySelector("#record-detail-fields");
 
 let backup = null;
 let addedRecords = 0;
+let hasWebChanges = false;
 let pendingReceiptImage = null;
+let editingRecordId = null;
 let receiptViewerTrigger = null;
+let recordDetailTrigger = null;
 let language = "ja";
 let currencySymbol = "¥";
 let moneyFormatter = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 });
@@ -39,8 +45,8 @@ fileInput.addEventListener("change", async () => {
   try {
     const parsed = JSON.parse(await file.text());
     validateBackup(parsed);
-    await saveLocalState(parsed, 0);
-    activateBackup(parsed, file.name, 0);
+    await saveLocalState(parsed, 0, false);
+    activateBackup(parsed, file.name, 0, false);
     saveStatus.textContent = "この端末に保存しました。次回起動時に自動で開きます。";
   } catch (error) {
     showError(error instanceof Error ? error.message : "JSONファイルを読み込めませんでした。");
@@ -51,15 +57,27 @@ fileInput.addEventListener("change", async () => {
 
 monthPicker.addEventListener("change", renderMonth);
 recordTypePicker.addEventListener("change", populateRecordCategories);
-recordForm.addEventListener("submit", addRecord);
+recordForm.addEventListener("submit", saveRecord);
+document.querySelector("#cancel-edit-button").addEventListener("click", cancelRecordEdit);
 document.querySelector("#export-backup-button").addEventListener("click", downloadUpdatedBackup);
 receiptPhotoInput.addEventListener("change", updateReceiptPreview);
 document.querySelector("#close-receipt-viewer").addEventListener("click", closeReceiptViewer);
+document.querySelector("#close-record-detail").addEventListener("click", closeRecordDetail);
+document.querySelector("#edit-record-button").addEventListener("click", () => {
+  if (!editingRecordId) return;
+  const recordId = editingRecordId;
+  closeRecordDetail(false);
+  beginRecordEdit(recordId);
+});
 receiptViewer.addEventListener("click", event => {
   if (event.target === receiptViewer) closeReceiptViewer();
 });
+recordDetailViewer.addEventListener("click", event => {
+  if (event.target === recordDetailViewer) closeRecordDetail();
+});
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !receiptViewer.hidden) closeReceiptViewer();
+  else if (event.key === "Escape" && !recordDetailViewer.hidden) closeRecordDetail();
 });
 
 window.addEventListener("DOMContentLoaded", initializeApp, { once: true });
@@ -74,7 +92,7 @@ async function initializeApp() {
     const saved = await loadLocalState();
     if (saved.backup) {
       validateBackup(saved.backup);
-      activateBackup(saved.backup, "この端末の保存データ", saved.addedRecords);
+      activateBackup(saved.backup, "この端末の保存データ", saved.addedRecords, saved.hasChanges);
       saveStatus.textContent = storageIsPersistent
         ? "この端末の保存データを開きました。"
         : "この端末の保存データを開きました。大切なデータは定期的にJSONで書き出してください。";
@@ -84,9 +102,11 @@ async function initializeApp() {
   }
 }
 
-function activateBackup(value, label, addedCount) {
+function activateBackup(value, label, addedCount, hasChanges = Number(addedCount) > 0) {
   backup = value;
   addedRecords = addedCount;
+  hasWebChanges = hasChanges;
+  editingRecordId = null;
   language = value.settings?.language === "english" ? "en" : "ja";
   currencySymbol = typeof value.settings?.currencySymbol === "string" ? value.settings.currencySymbol : "¥";
   moneyFormatter = new Intl.NumberFormat(language === "ja" ? "ja-JP" : "en-US", {
@@ -98,9 +118,11 @@ function activateBackup(value, label, addedCount) {
   dashboard.hidden = false;
   backupExportPanel.hidden = false;
   addedRecordCount.textContent = addedRecords > 0 ? `${addedRecords}件の記録を追加済み` : "記録は自動保存されます";
+  exportBackupButton.disabled = !hasWebChanges;
   pendingReceiptImage = null;
   receiptPhotoInput.value = "";
   receiptPreview.hidden = true;
+  document.querySelector("#receipt-edit-hint").hidden = true;
   populateMonths();
   populateRecordCategories();
   setDefaultRecordDate();
@@ -208,13 +230,30 @@ function setDefaultRecordDate() {
   recordDateInput.value = `${year}-${month}-${day}`;
 }
 
-async function addRecord(event) {
+async function saveRecord(event) {
   event.preventDefault();
   if (!backup || !recordForm.reportValidity()) return;
 
-  const category = backup.categories.find(item =>
-    item.id === recordCategoryPicker.value && item.type === recordTypePicker.value && !item.isHidden
+  const existingRecord = editingRecordId
+    ? backup.records.find(item => item.id === editingRecordId)
+    : null;
+  if (editingRecordId && !existingRecord) {
+    cancelRecordEdit();
+    showError("編集する記録が見つかりませんでした。記録一覧を開き直してください。");
+    return;
+  }
+  let category = backup.categories.find(item =>
+    item.id === recordCategoryPicker.value
+      && item.type === recordTypePicker.value
+      && (!item.isHidden || item.id === existingRecord?.categoryId)
   );
+  if (!category && existingRecord?.categoryId === recordCategoryPicker.value) {
+    category = {
+      id: existingRecord.categoryId,
+      type: existingRecord.type,
+      localizedNames: { [language]: categoryName(existingRecord) }
+    };
+  }
   const amount = Number(recordAmountInput.value);
   if (!category || !Number.isFinite(amount) || amount <= 0) return;
 
@@ -226,7 +265,8 @@ async function addRecord(event) {
   const appleSeconds = date => date.getTime() / 1000 - APPLE_EPOCH_OFFSET;
   const receiptImagePath = pendingReceiptImage ? `${createUUID()}.jpg` : null;
   const record = {
-    id: createUUID(),
+    ...(existingRecord || {}),
+    id: existingRecord?.id || createUUID(),
     type: recordTypePicker.value,
     date: appleSeconds(recordDate),
     categoryId: category.id,
@@ -236,44 +276,123 @@ async function addRecord(event) {
       || "",
     amount,
     memo: recordMemoInput.value.trim(),
-    receiptImagePath,
-    createdAt: appleSeconds(now),
+    receiptImagePath: receiptImagePath || existingRecord?.receiptImagePath || null,
+    createdAt: existingRecord?.createdAt ?? appleSeconds(now),
     updatedAt: appleSeconds(now)
   };
-  backup.records.push(record);
+
+  const previousRecords = backup.records;
+  const previousReceiptImages = backup.receiptImages;
+  const previousHasChanges = hasWebChanges;
+  backup.records = existingRecord
+    ? backup.records.map(item => item.id === record.id ? record : item)
+    : [...backup.records, record];
   if (pendingReceiptImage) {
+    const oldReceiptPath = existingRecord?.receiptImagePath;
+    const oldPathStillUsed = oldReceiptPath && backup.records.some(item => item.receiptImagePath === oldReceiptPath);
+    if (oldReceiptPath && !oldPathStillUsed) {
+      backup.receiptImages = backup.receiptImages.filter(image => image.fileName !== oldReceiptPath);
+    }
     backup.receiptImages.push({ fileName: receiptImagePath, data: pendingReceiptImage });
   }
 
-  addedRecords += 1;
+  if (!existingRecord) addedRecords += 1;
+  hasWebChanges = true;
   saveStatus.textContent = "保存中…";
   document.querySelector("#add-record-button").disabled = true;
   try {
-    await saveLocalState(backup, addedRecords);
+    await saveLocalState(backup, addedRecords, hasWebChanges);
     saveStatus.textContent = "この端末に自動保存しました。";
   } catch (error) {
-    backup.records = backup.records.filter(item => item.id !== record.id);
-    if (receiptImagePath) backup.receiptImages = backup.receiptImages.filter(image => image.fileName !== receiptImagePath);
-    addedRecords -= 1;
+    backup.records = previousRecords;
+    backup.receiptImages = previousReceiptImages;
+    hasWebChanges = previousHasChanges;
+    if (!existingRecord) addedRecords -= 1;
     showError(error instanceof Error ? error.message : "記録を端末に保存できませんでした。");
     saveStatus.textContent = "保存できませんでした。空き容量を確認してください。";
     document.querySelector("#add-record-button").disabled = false;
     return;
   }
+  editingRecordId = null;
+  document.querySelector("#record-form-title").textContent = "記録を追加";
+  document.querySelector("#add-record-button").textContent = "記録を追加";
+  document.querySelector("#cancel-edit-button").hidden = true;
   document.querySelector("#add-record-button").disabled = false;
-  addedRecordCount.textContent = `${addedRecords}件の記録`;
+  addedRecordCount.textContent = addedRecords > 0
+    ? `${addedRecords}件の記録を追加済み`
+    : "変更をこの端末に保存済み";
+  exportBackupButton.disabled = false;
   backupExportPanel.hidden = false;
-  document.querySelector("#backup-label").textContent = `読み込み済み · ${addedRecords}件追加`;
+  document.querySelector("#backup-label").textContent = addedRecords > 0
+    ? `読み込み済み · ${addedRecords}件追加`
+    : "読み込み済み";
   populateMonths();
   monthPicker.value = periodKey(recordDate);
   renderMonth();
+  recordTypePicker.value = "expense";
+  populateRecordCategories();
+  setDefaultRecordDate();
   recordAmountInput.value = "";
   recordMemoInput.value = "";
   pendingReceiptImage = null;
   receiptPhotoInput.value = "";
   receiptPreview.replaceChildren();
   receiptPreview.hidden = true;
-  recordAmountInput.focus();
+  document.querySelector("#receipt-edit-hint").hidden = true;
+  if (!existingRecord) recordAmountInput.focus();
+}
+
+function beginRecordEdit(recordId) {
+  const record = backup?.records.find(item => item.id === recordId);
+  const date = record ? dateFromBackup(record.date) : null;
+  if (!record || !date) return;
+
+  editingRecordId = record.id;
+  recordTypePicker.value = record.type === "income" ? "income" : "expense";
+  populateRecordCategories();
+  if (!Array.from(recordCategoryPicker.options).some(option => option.value === record.categoryId)) {
+    const option = document.createElement("option");
+    option.value = record.categoryId;
+    option.textContent = categoryName(record);
+    recordCategoryPicker.append(option);
+  }
+  recordCategoryPicker.disabled = false;
+  document.querySelector("#add-record-button").disabled = false;
+  recordCategoryPicker.value = record.categoryId;
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  recordDateInput.value = localDate.toISOString().slice(0, 10);
+  recordAmountInput.value = String(record.amount ?? "");
+  recordMemoInput.value = record.memo || "";
+  pendingReceiptImage = null;
+  receiptPhotoInput.value = "";
+  receiptPreview.replaceChildren();
+  receiptPreview.hidden = true;
+  document.querySelector("#receipt-edit-hint").hidden = !receiptImageBase64(record.receiptImagePath);
+  document.querySelector("#record-form-title").textContent = "記録を編集";
+  document.querySelector("#add-record-button").textContent = "変更を保存";
+  document.querySelector("#cancel-edit-button").hidden = false;
+  document.querySelector("#backup-label").textContent = "記録を編集中";
+  recordForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  recordAmountInput.focus({ preventScroll: true });
+}
+
+function cancelRecordEdit() {
+  editingRecordId = null;
+  pendingReceiptImage = null;
+  recordForm.reset();
+  recordTypePicker.value = "expense";
+  populateRecordCategories();
+  setDefaultRecordDate();
+  receiptPhotoInput.value = "";
+  receiptPreview.replaceChildren();
+  receiptPreview.hidden = true;
+  document.querySelector("#receipt-edit-hint").hidden = true;
+  document.querySelector("#record-form-title").textContent = "記録を追加";
+  document.querySelector("#add-record-button").textContent = "記録を追加";
+  document.querySelector("#cancel-edit-button").hidden = true;
+  if (backup) document.querySelector("#backup-label").textContent = addedRecords > 0
+    ? `読み込み済み · ${addedRecords}件追加`
+    : "読み込み済み";
 }
 
 async function updateReceiptPreview() {
@@ -341,7 +460,7 @@ function createUUID() {
 }
 
 function downloadUpdatedBackup() {
-  if (!backup || addedRecords === 0) return;
+  if (!backup || !hasWebChanges) return;
 
   backup.exportedAt = new Date().getTime() / 1000 - APPLE_EPOCH_OFFSET;
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -511,20 +630,27 @@ function renderRecords(records) {
       symbol = document.createElement("div");
       symbol.className = `record-symbol ${type}`;
       symbol.textContent = type === "income" ? "↙" : "↗";
+      symbol.setAttribute("aria-hidden", "true");
     }
-    const main = document.createElement("div");
-    main.className = "record-main";
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "record-main record-detail-trigger";
+    main.setAttribute("aria-label", `${dateLabel(date)} ${categoryName(record)} ${formatMoney(record.amount)}、詳細を表示`);
+    const copy = document.createElement("span");
+    copy.className = "record-copy";
     const title = document.createElement("div");
     title.className = "record-title";
     title.textContent = record.memo?.trim() || categoryName(record);
     const subtitle = document.createElement("div");
     subtitle.className = "record-subtitle";
     subtitle.textContent = `${dateLabel(date)} · ${categoryName(record)}`;
-    main.append(title, subtitle);
+    copy.append(title, subtitle);
     const amount = document.createElement("div");
     amount.className = `record-amount ${type}`;
     amount.textContent = `${type === "income" ? "+" : "−"}${formatMoney(record.amount)}`;
-    row.append(symbol, main, amount);
+    main.append(copy, amount);
+    main.addEventListener("click", () => openRecordDetail(record, date, main));
+    row.append(symbol, main);
     host.append(row);
   });
 
@@ -534,6 +660,43 @@ function renderRecords(records) {
     note.textContent = `最新${MAX_VISIBLE_RECORDS}件を表示しています`;
     host.append(note);
   }
+}
+
+function openRecordDetail(record, date, trigger) {
+  editingRecordId = record.id;
+  recordDetailFields.replaceChildren();
+  const type = record.type === "income" ? "収入" : "支出";
+  const amount = `${record.type === "income" ? "+" : "−"}${formatMoney(record.amount)}`;
+  const rows = [
+    ["種類", type],
+    ["日付", dateLabel(date, { year: "numeric", month: "long", day: "numeric" })],
+    ["カテゴリー", categoryName(record)],
+    ["金額", amount],
+    ["メモ", record.memo?.trim() || "なし"],
+    ["レシート写真", receiptImageBase64(record.receiptImagePath) ? "登録済み" : "なし"]
+  ];
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "record-detail-row";
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = value;
+    row.append(term, description);
+    recordDetailFields.append(row);
+  });
+  recordDetailTrigger = trigger;
+  recordDetailViewer.hidden = false;
+  document.body.style.overflow = "hidden";
+  document.querySelector("#close-record-detail").focus();
+}
+
+function closeRecordDetail(restoreFocus = true) {
+  recordDetailViewer.hidden = true;
+  document.body.style.overflow = "";
+  if (restoreFocus && recordDetailTrigger?.isConnected) recordDetailTrigger.focus();
+  recordDetailTrigger = null;
+  editingRecordId = null;
 }
 
 function openReceiptViewer(imageData, record, date, trigger) {

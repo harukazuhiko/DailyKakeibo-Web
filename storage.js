@@ -3,6 +3,7 @@ const DATABASE_VERSION = 1;
 const STORE_NAME = "state";
 const BACKUP_KEY = "backup";
 const ADDED_COUNT_KEY = "added-record-count";
+const HAS_CHANGES_KEY = "has-web-changes";
 
 let databasePromise;
 
@@ -42,17 +43,23 @@ async function writeValues(values) {
 }
 
 export async function loadLocalState() {
-  const [backup, addedRecords] = await Promise.all([
+  const [backup, addedRecords, hasChanges] = await Promise.all([
     readValue(BACKUP_KEY),
-    readValue(ADDED_COUNT_KEY)
+    readValue(ADDED_COUNT_KEY),
+    readValue(HAS_CHANGES_KEY)
   ]);
-  return { backup: backup || null, addedRecords: Number(addedRecords) || 0 };
+  return {
+    backup: backup || null,
+    addedRecords: Number(addedRecords) || 0,
+    hasChanges: Boolean(hasChanges) || Number(addedRecords) > 0
+  };
 }
 
-export async function saveLocalState(backup, addedRecords) {
+export async function saveLocalState(backup, addedRecords, hasChanges = Number(addedRecords) > 0) {
   await writeValues({
     [BACKUP_KEY]: backup,
-    [ADDED_COUNT_KEY]: Math.max(0, Number(addedRecords) || 0)
+    [ADDED_COUNT_KEY]: Math.max(0, Number(addedRecords) || 0),
+    [HAS_CHANGES_KEY]: Boolean(hasChanges)
   });
 }
 

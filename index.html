@@ -76,7 +76,8 @@
 
         <section class="panel entry-panel">
           <div class="panel-heading">
-            <div><p class="eyebrow">NEW ACTIVITY</p><h2>記録を追加</h2></div>
+            <div><p class="eyebrow">NEW ACTIVITY</p><h2 id="record-form-title">記録を追加</h2></div>
+            <button id="cancel-edit-button" class="cancel-edit-button" type="button" hidden>編集をやめる</button>
           </div>
           <form id="record-form" class="record-form">
             <label class="form-field">
@@ -109,6 +110,7 @@
             <button id="add-record-button" class="add-record-button" type="submit">記録を追加</button>
           </form>
           <div id="receipt-preview" class="receipt-preview" hidden></div>
+          <p id="receipt-edit-hint" class="form-hint" hidden>新しい写真を選ばない場合、登録済みのレシート写真を保持します。</p>
           <p id="category-hint" class="form-hint" hidden></p>
           <div id="backup-export-panel" class="backup-export-panel" hidden>
             <p id="save-status">この端末に自動保存しています。</p>
@@ -160,6 +162,16 @@
       </div>
       <img id="receipt-viewer-image" class="receipt-viewer-image" alt="拡大したレシート写真">
     </div>
+  </div>
+  <div id="record-detail-viewer" class="record-detail-viewer" role="dialog" aria-modal="true" aria-labelledby="record-detail-title" tabindex="-1" hidden>
+    <section class="record-detail-card">
+      <header class="record-detail-header">
+        <div><p class="eyebrow">RECORD DETAILS</p><h2 id="record-detail-title">記録の詳細</h2></div>
+        <button id="close-record-detail" class="close-record-detail" type="button" aria-label="詳細を閉じる">×</button>
+      </header>
+      <dl id="record-detail-fields" class="record-detail-fields"></dl>
+      <button id="edit-record-button" class="add-record-button record-detail-edit" type="button">この記録を編集</button>
+    </section>
   </div>
 </body>
 </html>
