@@ -20,6 +20,9 @@ const addedRecordCount = document.querySelector("#added-record-count");
 const receiptPhotoInput = document.querySelector("#receipt-photo");
 const receiptPreview = document.querySelector("#receipt-preview");
 const saveStatus = document.querySelector("#save-status");
+const receiptViewer = document.querySelector("#receipt-viewer");
+const receiptViewerImage = document.querySelector("#receipt-viewer-image");
+const receiptViewerCaption = document.querySelector("#receipt-viewer-title");
 
 let backup = null;
 let addedRecords = 0;
@@ -50,6 +53,10 @@ recordTypePicker.addEventListener("change", populateRecordCategories);
 recordForm.addEventListener("submit", addRecord);
 document.querySelector("#export-backup-button").addEventListener("click", downloadUpdatedBackup);
 receiptPhotoInput.addEventListener("change", updateReceiptPreview);
+document.querySelector("#close-receipt-viewer").addEventListener("click", () => receiptViewer.close());
+receiptViewer.addEventListener("click", event => {
+  if (event.target === receiptViewer) receiptViewer.close();
+});
 
 window.addEventListener("DOMContentLoaded", initializeApp, { once: true });
 
@@ -484,12 +491,21 @@ function renderRecords(records) {
     const row = document.createElement("div");
     row.className = "record-row";
     const receiptData = receiptImageBase64(record.receiptImagePath);
-    const symbol = receiptData ? document.createElement("img") : document.createElement("div");
-    symbol.className = receiptData ? "receipt-thumb" : `record-symbol ${type}`;
+    let symbol;
     if (receiptData) {
-      symbol.src = `data:image/jpeg;base64,${receiptData}`;
-      symbol.alt = "レシート写真";
+      symbol = document.createElement("button");
+      symbol.type = "button";
+      symbol.className = "receipt-thumb-button";
+      symbol.setAttribute("aria-label", `${dateLabel(date)}のレシート写真を拡大表示`);
+      const thumbnail = document.createElement("img");
+      thumbnail.className = "receipt-thumb";
+      thumbnail.src = `data:image/jpeg;base64,${receiptData}`;
+      thumbnail.alt = "";
+      symbol.append(thumbnail);
+      symbol.addEventListener("click", () => openReceiptViewer(receiptData, record, date));
     } else {
+      symbol = document.createElement("div");
+      symbol.className = `record-symbol ${type}`;
       symbol.textContent = type === "income" ? "↙" : "↗";
     }
     const main = document.createElement("div");
@@ -514,6 +530,12 @@ function renderRecords(records) {
     note.textContent = `最新${MAX_VISIBLE_RECORDS}件を表示しています`;
     host.append(note);
   }
+}
+
+function openReceiptViewer(imageData, record, date) {
+  receiptViewerImage.src = `data:image/jpeg;base64,${imageData}`;
+  receiptViewerCaption.textContent = `${dateLabel(date)} · ${record.memo?.trim() || categoryName(record)} · ${formatMoney(record.amount)}`;
+  receiptViewer.showModal();
 }
 
 function receiptImageBase64(fileName) {
