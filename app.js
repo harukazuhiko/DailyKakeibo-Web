@@ -1,3 +1,5 @@
+import { loadLocalState, requestPersistentStorage, saveLocalState } from "./storage.js";
+
 const APPLE_EPOCH_OFFSET = 978307200;
 const MAX_VISIBLE_RECORDS = 30;
 
@@ -15,9 +17,13 @@ const recordMemoInput = document.querySelector("#record-memo");
 const categoryHint = document.querySelector("#category-hint");
 const backupExportPanel = document.querySelector("#backup-export-panel");
 const addedRecordCount = document.querySelector("#added-record-count");
+const receiptPhotoInput = document.querySelector("#receipt-photo");
+const receiptPreview = document.querySelector("#receipt-preview");
+const saveStatus = document.querySelector("#save-status");
 
 let backup = null;
 let addedRecords = 0;
+let pendingReceiptImage = null;
 let language = "ja";
 let currencySymbol = "¥";
 let moneyFormatter = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 });
@@ -29,22 +35,9 @@ fileInput.addEventListener("change", async () => {
   try {
     const parsed = JSON.parse(await file.text());
     validateBackup(parsed);
-    backup = parsed;
-    addedRecords = 0;
-    backupExportPanel.hidden = true;
-    language = parsed.settings?.language === "english" ? "en" : "ja";
-    currencySymbol = typeof parsed.settings?.currencySymbol === "string" ? parsed.settings.currencySymbol : "¥";
-    moneyFormatter = new Intl.NumberFormat(language === "ja" ? "ja-JP" : "en-US", {
-      maximumFractionDigits: 0
-    });
-    hideError();
-    document.querySelector("#backup-label").textContent = file.name;
-    emptyState.hidden = true;
-    dashboard.hidden = false;
-    populateMonths();
-    populateRecordCategories();
-    setDefaultRecordDate();
-    renderMonth();
+    await saveLocalState(parsed, 0);
+    activateBackup(parsed, file.name, 0);
+    saveStatus.textContent = "この端末に保存しました。次回起動時に自動で開きます。";
   } catch (error) {
     showError(error instanceof Error ? error.message : "JSONファイルを読み込めませんでした。");
   } finally {
@@ -56,12 +49,59 @@ monthPicker.addEventListener("change", renderMonth);
 recordTypePicker.addEventListener("change", populateRecordCategories);
 recordForm.addEventListener("submit", addRecord);
 document.querySelector("#export-backup-button").addEventListener("click", downloadUpdatedBackup);
+receiptPhotoInput.addEventListener("change", updateReceiptPreview);
+
+window.addEventListener("DOMContentLoaded", initializeApp, { once: true });
+
+async function initializeApp() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  }
+  const storageIsPersistent = await requestPersistentStorage();
+
+  try {
+    const saved = await loadLocalState();
+    if (saved.backup) {
+      validateBackup(saved.backup);
+      activateBackup(saved.backup, "この端末の保存データ", saved.addedRecords);
+      saveStatus.textContent = storageIsPersistent
+        ? "この端末の保存データを開きました。"
+        : "この端末の保存データを開きました。大切なデータは定期的にJSONで書き出してください。";
+    }
+  } catch {
+    showError("この端末の保存データを読み込めませんでした。iPhoneアプリのバックアップを読み直してください。");
+  }
+}
+
+function activateBackup(value, label, addedCount) {
+  backup = value;
+  addedRecords = addedCount;
+  language = value.settings?.language === "english" ? "en" : "ja";
+  currencySymbol = typeof value.settings?.currencySymbol === "string" ? value.settings.currencySymbol : "¥";
+  moneyFormatter = new Intl.NumberFormat(language === "ja" ? "ja-JP" : "en-US", {
+    maximumFractionDigits: 0
+  });
+  hideError();
+  document.querySelector("#backup-label").textContent = label;
+  emptyState.hidden = true;
+  dashboard.hidden = false;
+  backupExportPanel.hidden = false;
+  addedRecordCount.textContent = addedRecords > 0 ? `${addedRecords}件の記録を追加済み` : "記録は自動保存されます";
+  pendingReceiptImage = null;
+  receiptPhotoInput.value = "";
+  receiptPreview.hidden = true;
+  populateMonths();
+  populateRecordCategories();
+  setDefaultRecordDate();
+  renderMonth();
+}
 
 function validateBackup(value) {
   if (!value || typeof value !== "object" || !Array.isArray(value.records)) {
     throw new Error("Daily Kakeiboのバックアップ形式ではありません。アプリから書き出したJSONを選んでください。");
   }
   if (!Array.isArray(value.categories)) value.categories = [];
+  if (!Array.isArray(value.receiptImages)) value.receiptImages = [];
   if (!Array.isArray(value.monthlyReports)) value.monthlyReports = [];
   if (!value.settings || typeof value.settings !== "object") value.settings = {};
 }
@@ -157,7 +197,7 @@ function setDefaultRecordDate() {
   recordDateInput.value = `${year}-${month}-${day}`;
 }
 
-function addRecord(event) {
+async function addRecord(event) {
   event.preventDefault();
   if (!backup || !recordForm.reportValidity()) return;
 
@@ -173,7 +213,8 @@ function addRecord(event) {
 
   const now = new Date();
   const appleSeconds = date => date.getTime() / 1000 - APPLE_EPOCH_OFFSET;
-  backup.records.push({
+  const receiptImagePath = pendingReceiptImage ? `${createUUID()}.jpg` : null;
+  const record = {
     id: createUUID(),
     type: recordTypePicker.value,
     date: appleSeconds(recordDate),
@@ -184,12 +225,31 @@ function addRecord(event) {
       || "",
     amount,
     memo: recordMemoInput.value.trim(),
-    receiptImagePath: null,
+    receiptImagePath,
     createdAt: appleSeconds(now),
     updatedAt: appleSeconds(now)
-  });
+  };
+  backup.records.push(record);
+  if (pendingReceiptImage) {
+    backup.receiptImages.push({ fileName: receiptImagePath, data: pendingReceiptImage });
+  }
 
   addedRecords += 1;
+  saveStatus.textContent = "保存中…";
+  document.querySelector("#add-record-button").disabled = true;
+  try {
+    await saveLocalState(backup, addedRecords);
+    saveStatus.textContent = "この端末に自動保存しました。";
+  } catch (error) {
+    backup.records = backup.records.filter(item => item.id !== record.id);
+    if (receiptImagePath) backup.receiptImages = backup.receiptImages.filter(image => image.fileName !== receiptImagePath);
+    addedRecords -= 1;
+    showError(error instanceof Error ? error.message : "記録を端末に保存できませんでした。");
+    saveStatus.textContent = "保存できませんでした。空き容量を確認してください。";
+    document.querySelector("#add-record-button").disabled = false;
+    return;
+  }
+  document.querySelector("#add-record-button").disabled = false;
   addedRecordCount.textContent = `${addedRecords}件の記録`;
   backupExportPanel.hidden = false;
   document.querySelector("#backup-label").textContent = `読み込み済み · ${addedRecords}件追加`;
@@ -198,7 +258,67 @@ function addRecord(event) {
   renderMonth();
   recordAmountInput.value = "";
   recordMemoInput.value = "";
+  pendingReceiptImage = null;
+  receiptPhotoInput.value = "";
+  receiptPreview.replaceChildren();
+  receiptPreview.hidden = true;
   recordAmountInput.focus();
+}
+
+async function updateReceiptPreview() {
+  const file = receiptPhotoInput.files?.[0];
+  pendingReceiptImage = null;
+  receiptPreview.replaceChildren();
+  receiptPreview.hidden = true;
+  if (!file) return;
+
+  try {
+    pendingReceiptImage = await optimizeReceiptImage(file);
+    const image = document.createElement("img");
+    image.src = `data:image/jpeg;base64,${pendingReceiptImage}`;
+    image.alt = "レシートのプレビュー";
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "remove-receipt-button";
+    removeButton.textContent = "写真を外す";
+    removeButton.addEventListener("click", () => {
+      pendingReceiptImage = null;
+      receiptPhotoInput.value = "";
+      receiptPreview.replaceChildren();
+      receiptPreview.hidden = true;
+    });
+    receiptPreview.append(image, removeButton);
+    receiptPreview.hidden = false;
+  } catch {
+    showError("レシート写真を読み込めませんでした。別の画像を選んでください。");
+    receiptPhotoInput.value = "";
+  }
+}
+
+async function optimizeReceiptImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const maxDimension = 1800;
+  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Image canvas is unavailable.");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob(result => result ? resolve(result) : reject(new Error("Image conversion failed.")), "image/jpeg", 0.68);
+  });
+  return blobToBase64(blob);
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = () => reject(reader.error || new Error("画像を読み込めませんでした。"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 function createUUID() {
@@ -298,6 +418,8 @@ function categoryName(record) {
 
 function renderCategories(expenses, total) {
   const host = document.querySelector("#category-list");
+  const chart = document.querySelector("#category-chart");
+  chart.replaceChildren();
   const groups = new Map();
   expenses.forEach(({ record }) => {
     const name = categoryName(record);
@@ -308,16 +430,32 @@ function renderCategories(expenses, total) {
   document.querySelector("#category-count").textContent = `${sorted.length}カテゴリー`;
   host.replaceChildren();
   if (sorted.length === 0) {
+    chart.replaceChildren();
+    chart.hidden = true;
     host.append(emptyMessage("この月の支出記録はありません"));
     return;
   }
 
-  sorted.slice(0, 7).forEach(([name, amount]) => {
+  chart.hidden = false;
+  const palette = ["#367a59", "#e3a16d", "#7c9eaf", "#b07c9e", "#d1bb62", "#7b8f68", "#c47860", "#8890b7"];
+  let stop = 0;
+  const stops = sorted.map(([, amount], index) => {
+    const start = stop;
+    stop += total > 0 ? amount / total * 100 : 0;
+    return `${palette[index % palette.length]} ${start}% ${stop}%`;
+  });
+  chart.style.background = `conic-gradient(${stops.join(", ")})`;
+  const chartValue = document.createElement("strong");
+  chartValue.textContent = formatMoney(total);
+  chart.append(chartValue);
+
+  sorted.slice(0, 7).forEach(([name, amount], index) => {
     const row = document.createElement("div");
     row.className = "category-row";
     const label = document.createElement("div");
     label.className = "category-name";
     label.textContent = name;
+    label.style.setProperty("--category-color", palette[index % palette.length]);
     const track = document.createElement("div");
     track.className = "bar-track";
     const fill = document.createElement("div");
@@ -345,9 +483,15 @@ function renderRecords(records) {
     const type = record.type === "income" ? "income" : "expense";
     const row = document.createElement("div");
     row.className = "record-row";
-    const symbol = document.createElement("div");
-    symbol.className = `record-symbol ${type}`;
-    symbol.textContent = type === "income" ? "↙" : "↗";
+    const receiptData = receiptImageBase64(record.receiptImagePath);
+    const symbol = receiptData ? document.createElement("img") : document.createElement("div");
+    symbol.className = receiptData ? "receipt-thumb" : `record-symbol ${type}`;
+    if (receiptData) {
+      symbol.src = `data:image/jpeg;base64,${receiptData}`;
+      symbol.alt = "レシート写真";
+    } else {
+      symbol.textContent = type === "income" ? "↙" : "↗";
+    }
     const main = document.createElement("div");
     main.className = "record-main";
     const title = document.createElement("div");
@@ -370,6 +514,11 @@ function renderRecords(records) {
     note.textContent = `最新${MAX_VISIBLE_RECORDS}件を表示しています`;
     host.append(note);
   }
+}
+
+function receiptImageBase64(fileName) {
+  if (!fileName) return null;
+  return backup.receiptImages.find(image => image.fileName === fileName)?.data || null;
 }
 
 function renderReport(selectedMonth) {

@@ -41,6 +41,7 @@ h1 { font-size: clamp(26px, 4vw, 34px); letter-spacing: -.055em; line-height: 1.
 .empty-card p { color: var(--muted); font-size: 12px; line-height: 1.9; margin: 0; }
 .empty-button { margin-top: 19px; min-width: 130px; }
 .file-hint { margin-top: 11px !important; font-size: 10px !important; color: #a4aaa5 !important; }
+.install-help { margin-top: 8px !important; font-size: 11px !important; }
 .dashboard-toolbar { display: flex; align-items: center; gap: 11px; min-height: 53px; margin: 0 0 14px; }
 .loaded-file { margin-right: auto; color: #78847a; font-size: 11px; display: flex; align-items: center; gap: 7px; overflow: hidden; }
 .loaded-file span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -51,10 +52,14 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
 .summary-card, .panel { border: 1px solid var(--line); background: var(--card); border-radius: 14px; }
 .entry-panel { margin-top: 13px; }
 .entry-panel .panel-heading { margin-bottom: 14px; }
-.record-form { display: grid; grid-template-columns: .8fr 1fr 1.4fr 1fr 1.6fr auto; align-items: end; gap: 10px; }
+.record-form { display: grid; grid-template-columns: .8fr 1fr 1.4fr 1fr 1.6fr 1.3fr auto; align-items: end; gap: 10px; }
 .form-field { display: grid; gap: 7px; color: #727c75; font-size: 10px; }
 .form-field input, .form-field select { width: 100%; min-width: 0; min-height: 40px; border: 1px solid #e5e6df; border-radius: 8px; background-color: white; color: var(--ink); padding: 9px 10px; font: inherit; font-size: 12px; }
 .form-field select { padding-right: 28px; }
+.receipt-field input { padding: 6px !important; font-size: 10px !important; }
+.receipt-preview { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.receipt-preview img { width: 76px; height: 76px; object-fit: cover; border-radius: 9px; border: 1px solid var(--line); }
+.remove-receipt-button { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: #69746c; background: white; font: inherit; font-size: 11px; }
 .add-record-button, .export-backup-button { cursor: pointer; min-height: 40px; border: 0; border-radius: 9px; padding: 10px 14px; background: var(--green); color: white; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .add-record-button:hover, .export-backup-button:hover { background: #2b684a; }
 .add-record-button:disabled { cursor: not-allowed; background: #aeb8b0; }
@@ -78,8 +83,12 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
 .panel-heading h2 { margin: 0; font-size: 16px; letter-spacing: -.035em; }
 .panel-meta { color: #a0a69f; font-size: 10px; }
 .category-list { display: grid; gap: 15px; }
+.category-chart { width: 164px; height: 164px; margin: 0 auto 22px; display: grid; place-items: center; border-radius: 50%; position: relative; }
+.category-chart::before { content: ""; position: absolute; inset: 18px; border-radius: 50%; background: white; }
+.category-chart strong { z-index: 1; max-width: 110px; color: var(--ink); font-size: 15px; text-align: center; overflow-wrap: anywhere; }
 .category-row { display: grid; grid-template-columns: minmax(74px, 1fr) minmax(80px, 2fr) auto; align-items: center; gap: 11px; }
 .category-name { font-size: 11px; color: #646d66; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.category-name::before { content: ""; width: 7px; height: 7px; display: inline-block; margin-right: 6px; vertical-align: 1px; border-radius: 50%; background: var(--category-color, #78a687); }
 .bar-track { height: 7px; background: #f0f1ec; border-radius: 10px; overflow: hidden; }
 .bar-fill { height: 100%; background: #78a687; border-radius: inherit; min-width: 2px; }
 .category-amount { text-align: right; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -95,6 +104,7 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
 .record-symbol { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: #f5f4ef; color: #7d867e; font-size: 13px; }
 .record-symbol.income { background: var(--green-soft); color: var(--green); }
 .record-symbol.expense { background: var(--orange-soft); color: var(--orange); }
+.receipt-thumb { width: 38px; height: 38px; object-fit: cover; border-radius: 10px; }
 .record-main { min-width: 0; }
 .record-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #404842; font-size: 11px; font-weight: 600; }
 .record-subtitle { margin-top: 4px; color: #a0a69f; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -121,6 +131,7 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
   .entry-panel { margin-top: 10px; }
   .record-form { grid-template-columns: 1fr 1fr; gap: 11px 9px; }
   .memo-field { grid-column: 1 / -1; }
+  .receipt-field { grid-column: 1 / -1; }
   .add-record-button { grid-column: 1 / -1; width: 100%; }
   .backup-export-panel { padding: 13px; }
   .summary-card { min-height: 118px; padding: 15px 14px 13px; }
@@ -131,5 +142,6 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
   .panel-heading { margin-bottom: 17px; }
   .records-panel { margin-top: 10px; padding-bottom: 5px; }
   .category-row { grid-template-columns: minmax(75px, 1fr) minmax(55px, 1.5fr) auto; gap: 8px; }
+  .category-chart { width: 142px; height: 142px; }
   .privacy-footer { align-items: start; text-align: left; justify-content: flex-start; font-size: 9px; line-height: 1.6; }
 }

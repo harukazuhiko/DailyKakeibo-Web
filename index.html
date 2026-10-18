@@ -4,9 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f5f0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Daily Kakeibo">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>Daily Kakeibo</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
   <link rel="stylesheet" href="./styles.css">
-  <script src="./app.js" defer></script>
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
   <div class="page-shell">
@@ -23,7 +29,7 @@
         <div>
           <p class="eyebrow">YOUR MONEY, AT A GLANCE</p>
           <h1>家計のようす</h1>
-          <p class="intro-copy">記録を読み込んで、月ごとの収支を確認できます。</p>
+          <p class="intro-copy">端末に保存して、いつでも続きから使えます。</p>
         </div>
         <label class="import-button" for="backup-file">
           <span class="upload-icon" aria-hidden="true">↑</span>
@@ -36,10 +42,11 @@
 
       <section id="empty-state" class="empty-card">
         <div class="empty-art" aria-hidden="true"><span>¥</span><i></i><b></b></div>
-        <h2>バックアップを読み込んでください</h2>
-        <p>iPhoneアプリの「設定 → データ管理」から保存したJSONファイルを選びます。<br>ファイルはこのブラウザ内で読み込み、外部へ送信しません。</p>
-        <label class="empty-button" for="backup-file">ファイルを選ぶ</label>
-        <p class="file-hint">DailyKakeibo-Backup-….json</p>
+        <h2>家計簿をはじめましょう</h2>
+        <p>iPhoneアプリのバックアップを読み込むと、記録・カテゴリー・設定を引き継げます。<br>読み込んだデータはこの端末内に自動保存されます。</p>
+        <label class="empty-button" for="backup-file">バックアップを読み込む</label>
+        <p class="file-hint">ホーム画面に追加するとアプリのように起動します</p>
+        <p id="pwa-install-help" class="install-help">Safariの共有ボタンから「ホーム画面に追加」を選んでください。</p>
       </section>
 
       <section id="dashboard" hidden>
@@ -95,13 +102,19 @@
               <span>メモ（任意）</span>
               <input id="record-memo" type="text" maxlength="120" placeholder="例：昼食">
             </label>
+            <label class="form-field receipt-field">
+              <span>レシート写真（任意）</span>
+              <input id="receipt-photo" type="file" accept="image/*" capture="environment">
+            </label>
             <button id="add-record-button" class="add-record-button" type="submit">記録を追加</button>
           </form>
+          <div id="receipt-preview" class="receipt-preview" hidden></div>
           <p id="category-hint" class="form-hint" hidden></p>
           <div id="backup-export-panel" class="backup-export-panel" hidden>
-            <p><strong id="added-record-count"></strong>を追加しました。iPhoneへ反映する場合は、更新したバックアップを保存してアプリで復元してください。</p>
+            <p id="save-status">この端末に自動保存しています。</p>
+            <p><strong id="added-record-count"></strong>。iPhoneアプリへ反映する場合はバックアップを書き出してください。</p>
             <p class="restore-warning">復元すると、iPhone内の記録・設定などはこのバックアップの内容に置き換わります。復元前に、iPhone側の最新バックアップを保存してください。</p>
-            <button id="export-backup-button" class="export-backup-button" type="button">更新したバックアップを保存</button>
+            <button id="export-backup-button" class="export-backup-button" type="button">iPhoneへ渡すバックアップを書き出す</button>
           </div>
         </section>
 
@@ -111,6 +124,7 @@
               <div><p class="eyebrow">WHERE IT WENT</p><h2>支出の内訳</h2></div>
               <span id="category-count" class="panel-meta"></span>
             </div>
+            <div id="category-chart" class="category-chart" role="img" aria-label="カテゴリー別支出の円グラフ"></div>
             <div id="category-list" class="category-list"></div>
           </section>
 
@@ -133,7 +147,7 @@
 
         <footer class="privacy-footer">
           <span class="lock-icon" aria-hidden="true">⌑</span>
-          <span>データは読み込んだブラウザ内でのみ表示されます。画面を閉じると読み込み状態は消えます。</span>
+          <span>データとレシート写真はこの端末内に保存され、サイトには送信されません。iPhoneアプリとは別々に管理されます。</span>
         </footer>
       </section>
     </main>
