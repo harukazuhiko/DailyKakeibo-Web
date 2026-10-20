@@ -43,10 +43,54 @@
       <section id="empty-state" class="empty-card">
         <div class="empty-art" aria-hidden="true"><span>¥</span><i></i><b></b></div>
         <h2>家計簿をはじめましょう</h2>
-        <p>iPhoneアプリのバックアップを読み込むと、記録・カテゴリー・設定を引き継げます。<br>読み込んだデータはこの端末内に自動保存されます。</p>
+        <p>iPhoneアプリのバックアップを読み込むか、初期設定から新しく始められます。<br>データはこの端末内に自動保存されます。</p>
         <label class="empty-button" for="backup-file">バックアップを読み込む</label>
+        <button id="show-initial-setup" class="setup-start-button" type="button">初期設定して始める</button>
         <p class="file-hint">ホーム画面に追加するとアプリのように起動します</p>
         <p id="pwa-install-help" class="install-help">Safariの共有ボタンから「ホーム画面に追加」を選んでください。</p>
+      </section>
+
+      <section id="initial-setup" class="panel initial-setup" hidden>
+        <div class="panel-heading">
+          <div><p class="eyebrow">GETTING STARTED</p><h2>最初の設定</h2></div>
+          <button id="cancel-initial-setup" class="cancel-edit-button" type="button">戻る</button>
+        </div>
+        <p class="setup-description">あとから変更できます。設定はこの端末に保存され、iPhoneアプリへ移す場合はバックアップを書き出せます。</p>
+        <div class="setup-fields">
+          <label class="form-field">
+            <span>表示言語</span>
+            <select id="setup-language"><option value="japanese">日本語</option><option value="english">English</option></select>
+          </label>
+          <label class="form-field">
+            <span>月次集計の締め日</span>
+            <select id="setup-closing-day"><option value="monthEnd">月末</option></select>
+          </label>
+        </div>
+        <div class="setup-categories-heading">
+          <div><h3>カテゴリー</h3><p>使わない項目はチェックを外せます。</p></div>
+        </div>
+        <div id="setup-category-list" class="setup-category-list"></div>
+        <div class="setup-custom-category">
+          <h3>カテゴリーを追加</h3>
+          <div class="setup-custom-fields">
+            <label class="form-field"><span>種類</span><select id="setup-new-category-type"><option value="expense">支出</option><option value="income">収入</option></select></label>
+            <label class="form-field"><span>日本語名</span><input id="setup-new-category-ja" type="text" maxlength="40" placeholder="例：ペット"></label>
+            <label class="form-field"><span>英語名</span><input id="setup-new-category-en" type="text" maxlength="40" placeholder="例：Pets"></label>
+            <button id="add-setup-category" class="cancel-edit-button" type="button">追加</button>
+          </div>
+        </div>
+        <div class="setup-savings">
+          <h3>貯蓄目標（任意）</h3>
+          <label class="setup-savings-toggle"><input id="setup-savings-enabled" type="checkbox"> <span>貯蓄目標を設定する</span></label>
+          <div id="setup-savings-fields" class="setup-savings-fields" hidden>
+            <label class="form-field"><span>目標タイプ</span><select id="setup-savings-mode"><option value="targetByDeadline">期限までに目標額</option><option value="monthlyAmount">毎月の貯蓄額</option></select></label>
+            <label id="setup-target-amount-field" class="form-field"><span>目標金額</span><input id="setup-target-amount" type="number" min="0" step="1" inputmode="numeric" placeholder="例：500000"></label>
+            <label id="setup-deadline-field" class="form-field"><span>目標期限</span><input id="setup-deadline" type="date"></label>
+            <label id="setup-monthly-savings-field" class="form-field" hidden><span>毎月の貯蓄額</span><input id="setup-monthly-savings-amount" type="number" min="0" step="1" inputmode="numeric" placeholder="例：30000"></label>
+          </div>
+        </div>
+        <button id="finish-initial-setup" class="add-record-button finish-setup-button" type="button">この設定で始める</button>
+        <p class="setup-note">ブラウザ版では通知設定はまだ利用できません。記録の追加やレシート写真は、開始後に使えます。</p>
       </section>
 
       <section id="dashboard" hidden>

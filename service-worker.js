@@ -1,4 +1,4 @@
-const CACHE_NAME = "daily-kakeibo-shell-v4";
+const CACHE_NAME = "daily-kakeibo-shell-v5";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./storage.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", event => {

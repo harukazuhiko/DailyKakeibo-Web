@@ -26,6 +26,26 @@ const receiptViewerImage = document.querySelector("#receipt-viewer-image");
 const receiptViewerCaption = document.querySelector("#receipt-viewer-title");
 const recordDetailViewer = document.querySelector("#record-detail-viewer");
 const recordDetailFields = document.querySelector("#record-detail-fields");
+const initialSetup = document.querySelector("#initial-setup");
+const setupCategoryList = document.querySelector("#setup-category-list");
+
+const DEFAULT_CATEGORIES = [
+  ["expense", "食費", "Food"], ["expense", "日用品", "Daily Goods"],
+  ["expense", "交通", "Transport"], ["expense", "住居", "Housing"],
+  ["expense", "光熱費", "Utilities"], ["expense", "通信", "Internet & Phone"],
+  ["expense", "医療", "Health"], ["expense", "保険", "Insurance"],
+  ["expense", "教育", "Education"], ["expense", "娯楽", "Entertainment"],
+  ["expense", "交際", "Social"], ["expense", "衣服", "Clothing"],
+  ["expense", "美容", "Beauty"], ["expense", "旅行", "Travel"],
+  ["expense", "サブスク", "Subscriptions"], ["expense", "税金", "Taxes"],
+  ["expense", "その他", "Other"], ["income", "給与", "Salary"],
+  ["income", "副収入", "Side Income"], ["income", "ボーナス", "Bonus"],
+  ["income", "投資", "Investment"], ["income", "お小遣い", "Allowance"],
+  ["income", "返金", "Refund"], ["income", "その他", "Other"]
+];
+let setupCategories = DEFAULT_CATEGORIES.map(([type, japaneseName, englishName]) => ({
+  id: createUUID(), type, japaneseName, englishName, isHidden: false, isDefault: true
+}));
 
 let backup = null;
 let addedRecords = 0;
@@ -69,6 +89,12 @@ document.querySelector("#edit-record-button").addEventListener("click", () => {
   closeRecordDetail(false);
   beginRecordEdit(recordId);
 });
+document.querySelector("#show-initial-setup").addEventListener("click", openInitialSetup);
+document.querySelector("#cancel-initial-setup").addEventListener("click", closeInitialSetup);
+document.querySelector("#add-setup-category").addEventListener("click", addInitialSetupCategory);
+document.querySelector("#finish-initial-setup").addEventListener("click", finishInitialSetup);
+document.querySelector("#setup-savings-enabled").addEventListener("change", updateSavingsSetupFields);
+document.querySelector("#setup-savings-mode").addEventListener("change", updateSavingsSetupFields);
 receiptViewer.addEventListener("click", event => {
   if (event.target === receiptViewer) closeReceiptViewer();
 });
@@ -115,6 +141,7 @@ function activateBackup(value, label, addedCount, hasChanges = Number(addedCount
   hideError();
   document.querySelector("#backup-label").textContent = label;
   emptyState.hidden = true;
+  initialSetup.hidden = true;
   dashboard.hidden = false;
   backupExportPanel.hidden = false;
   addedRecordCount.textContent = addedRecords > 0 ? `${addedRecords}件の記録を追加済み` : "記録は自動保存されます";
@@ -127,6 +154,139 @@ function activateBackup(value, label, addedCount, hasChanges = Number(addedCount
   populateRecordCategories();
   setDefaultRecordDate();
   renderMonth();
+}
+
+function openInitialSetup() {
+  emptyState.hidden = true;
+  initialSetup.hidden = false;
+  populateSetupCategories();
+  document.querySelector("#setup-closing-day").replaceChildren(
+    new Option("月末", "monthEnd"),
+    ...Array.from({ length: 28 }, (_, index) => new Option(`${index + 1}日`, String(index + 1)))
+  );
+  const defaultDeadline = new Date();
+  defaultDeadline.setMonth(defaultDeadline.getMonth() + 6);
+  document.querySelector("#setup-deadline").value = `${defaultDeadline.getFullYear()}-${String(defaultDeadline.getMonth() + 1).padStart(2, "0")}-${String(defaultDeadline.getDate()).padStart(2, "0")}`;
+  updateSavingsSetupFields();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function closeInitialSetup() {
+  initialSetup.hidden = true;
+  emptyState.hidden = false;
+}
+
+function populateSetupCategories() {
+  setupCategoryList.replaceChildren();
+  for (const [type, title] of [["expense", "支出"], ["income", "収入"]]) {
+    const group = document.createElement("div");
+    group.className = "setup-category-group";
+    const heading = document.createElement("p");
+    heading.className = "setup-category-group-title";
+    heading.textContent = title;
+    group.append(heading);
+    setupCategories.filter(category => category.type === type).forEach(category => {
+      const label = document.createElement("label");
+      label.className = "setup-category-option";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = !category.isHidden;
+      checkbox.addEventListener("change", () => { category.isHidden = !checkbox.checked; });
+      const name = document.createElement("span");
+      name.textContent = `${category.japaneseName} / ${category.englishName}`;
+      label.append(checkbox, name);
+      group.append(label);
+    });
+    setupCategoryList.append(group);
+  }
+}
+
+function addInitialSetupCategory() {
+  const japaneseNameInput = document.querySelector("#setup-new-category-ja");
+  const englishNameInput = document.querySelector("#setup-new-category-en");
+  const japaneseName = japaneseNameInput.value.trim();
+  const englishName = englishNameInput.value.trim();
+  if (!japaneseName && !englishName) {
+    japaneseNameInput.focus();
+    return;
+  }
+  const type = document.querySelector("#setup-new-category-type").value;
+  setupCategories.push({
+    id: createUUID(), type,
+    japaneseName: japaneseName || englishName,
+    englishName: englishName || japaneseName,
+    isHidden: false, isDefault: false
+  });
+  japaneseNameInput.value = "";
+  englishNameInput.value = "";
+  populateSetupCategories();
+}
+
+function updateSavingsSetupFields() {
+  const enabled = document.querySelector("#setup-savings-enabled").checked;
+  const mode = document.querySelector("#setup-savings-mode").value;
+  document.querySelector("#setup-savings-fields").hidden = !enabled;
+  document.querySelector("#setup-target-amount-field").hidden = !enabled || mode !== "targetByDeadline";
+  document.querySelector("#setup-deadline-field").hidden = !enabled || mode !== "targetByDeadline";
+  document.querySelector("#setup-monthly-savings-field").hidden = !enabled || mode !== "monthlyAmount";
+}
+
+async function finishInitialSetup() {
+  if (!["expense", "income"].every(type => setupCategories.some(category => category.type === type && !category.isHidden))) {
+    showError("支出と収入それぞれに、表示するカテゴリーを1つ以上選んでください。");
+    return;
+  }
+
+  const now = Date.now() / 1000 - APPLE_EPOCH_OFFSET;
+  const closingDayValue = document.querySelector("#setup-closing-day").value;
+  const savingsGoalEnabled = document.querySelector("#setup-savings-enabled").checked;
+  const savingsMode = document.querySelector("#setup-savings-mode").value;
+  const deadlineInput = document.querySelector("#setup-deadline").value;
+  const deadlineDate = deadlineInput ? new Date(`${deadlineInput}T12:00:00`) : new Date();
+  const deadlineAppleSeconds = deadlineDate.getTime() / 1000 - APPLE_EPOCH_OFFSET;
+  const createdBackup = {
+    version: 1,
+    exportedAt: now,
+    settings: {
+      language: document.querySelector("#setup-language").value,
+      closingDay: closingDayValue === "monthEnd" ? { monthEnd: {} } : { day: { _0: Number(closingDayValue) } },
+      initialCarryOver: 0,
+      monthlyExpenseBudget: 0,
+      currencySymbol: "¥",
+      isInitialSetupCompleted: true,
+      savingsGoal: {
+        id: createUUID(), isEnabled: savingsGoalEnabled, mode: savingsMode,
+        targetAmount: Number(document.querySelector("#setup-target-amount").value) || 0,
+        monthlySavingsAmount: Number(document.querySelector("#setup-monthly-savings-amount").value) || 0,
+        currentSavedAmount: 0, deadline: deadlineAppleSeconds
+      },
+      notificationSettings: {
+        isDailyReminderEnabled: false, dailyReminderHour: 21, dailyReminderMinute: 0,
+        isWeeklySummaryEnabled: false, isMonthlyReportEnabled: false
+      }
+    },
+    categories: setupCategories.map((category, index) => ({
+      id: category.id,
+      type: category.type,
+      localizedNames: { ja: category.japaneseName, en: category.englishName },
+      isDefault: category.isDefault,
+      isHidden: category.isHidden,
+      sortOrder: setupCategories.slice(0, index).filter(item => item.type === category.type).length + 1,
+      createdAt: now,
+      updatedAt: now
+    })),
+    records: [],
+    receiptImages: [],
+    monthlyReports: []
+  };
+
+  try {
+    await saveLocalState(createdBackup, 0, true);
+    activateBackup(createdBackup, "初期設定から開始", 0, true);
+    saveStatus.textContent = "初期設定をこの端末に保存しました。次回起動時に自動で開きます。";
+  } catch {
+    showError("初期設定をこの端末に保存できませんでした。ブラウザのストレージ設定を確認してください。");
+  }
 }
 
 function validateBackup(value) {
