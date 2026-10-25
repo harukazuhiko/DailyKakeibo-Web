@@ -100,6 +100,19 @@
           <select id="month-picker" aria-label="表示する月"></select>
         </div>
 
+        <section class="panel matrix-panel">
+          <div class="panel-heading matrix-heading">
+            <div><p class="eyebrow">YEARLY OVERVIEW</p><h2>月別項目一覧</h2></div>
+            <label class="month-picker-label" for="matrix-year-picker">表示年</label>
+            <select id="matrix-year-picker" aria-label="集計する年"></select>
+          </div>
+          <p class="matrix-help">金額をタップすると、その月・カテゴリーの記録を確認できます。</p>
+          <p id="matrix-empty" class="matrix-empty" hidden>記録があると、年ごとの月別一覧を表示します。</p>
+          <div id="matrix-scroll" class="matrix-scroll" tabindex="0" aria-label="月別項目一覧。横にスクロールできます">
+            <table id="category-matrix" class="category-matrix" aria-label="年別カテゴリー収支"></table>
+          </div>
+        </section>
+
         <div class="summary-grid">
           <article class="summary-card balance-card">
             <div class="card-label"><span class="card-icon balance-icon">↗</span>今月の収支</div>
@@ -215,6 +228,15 @@
       </header>
       <dl id="record-detail-fields" class="record-detail-fields"></dl>
       <button id="edit-record-button" class="add-record-button record-detail-edit" type="button">この記録を編集</button>
+    </section>
+  </div>
+  <div id="matrix-breakdown-viewer" class="matrix-breakdown-viewer" role="dialog" aria-modal="true" aria-labelledby="matrix-breakdown-title" tabindex="-1" hidden>
+    <section class="matrix-breakdown-card">
+      <header class="record-detail-header">
+        <div><p class="eyebrow">CATEGORY DETAILS</p><h2 id="matrix-breakdown-title">月別の記録</h2></div>
+        <button id="close-matrix-breakdown" class="close-record-detail" type="button" aria-label="内訳を閉じる">×</button>
+      </header>
+      <div id="matrix-breakdown-records" class="matrix-breakdown-records"></div>
     </section>
   </div>
 </body>

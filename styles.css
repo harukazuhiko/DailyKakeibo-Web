@@ -75,6 +75,34 @@ h1 { font-size: clamp(26px, 4vw, 34px); letter-spacing: -.055em; line-height: 1.
 select { appearance: none; border: 1px solid #e5e6df; background: white; border-radius: 8px; color: var(--ink); padding: 9px 31px 9px 11px; font-size: 12px; font-weight: 600; background-image: linear-gradient(45deg, transparent 50%, #7e8981 50%), linear-gradient(135deg, #7e8981 50%, transparent 50%); background-position: calc(100% - 14px) 14px, calc(100% - 10px) 14px; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat; }
 .summary-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 13px; }
 .summary-card, .panel { border: 1px solid var(--line); background: var(--card); border-radius: 14px; }
+.matrix-panel { margin-bottom: 13px; padding-bottom: 14px; }
+.matrix-heading { justify-content: flex-start; gap: 10px; margin-bottom: 8px; }
+.matrix-heading > div { margin-right: auto; }
+.matrix-heading label { margin-left: auto; }
+.matrix-help { margin: 0 0 10px; color: #9aa19b; font-size: 10px; }
+.matrix-empty { margin: 0; padding: 27px 10px; color: #9aa19b; font-size: 12px; text-align: center; }
+.matrix-scroll { max-height: min(62vh, 650px); overflow: auto; border: 1px solid #eceee8; border-radius: 9px; overscroll-behavior: contain; }
+.category-matrix { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.category-matrix th, .category-matrix td { min-width: 104px; height: 43px; padding: 7px 9px; border-right: 1px solid #f0f1ec; border-bottom: 1px solid #f0f1ec; background: #fff; text-align: right; white-space: nowrap; font-size: 10px; }
+.category-matrix thead th { position: sticky; top: 0; z-index: 3; height: 38px; background: #f7f8f5; color: #717b73; font-weight: 700; text-align: center; }
+.category-matrix .matrix-label-cell { position: sticky; left: 0; z-index: 2; width: 154px; min-width: 154px; max-width: 154px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.category-matrix thead .matrix-label-cell { z-index: 4; background: #f7f8f5; }
+.category-matrix tbody th.matrix-label-cell { color: #5b655d; font-weight: 500; }
+.category-matrix .income-section th, .category-matrix .income-section td { background: #eff6f0; color: var(--green); font-weight: 700; }
+.category-matrix .expense-section th, .category-matrix .expense-section td { background: #fbf1eb; color: var(--orange); font-weight: 700; }
+.category-matrix .income-total th, .category-matrix .income-total td { background: #f7faf7; color: var(--green); font-weight: 700; }
+.category-matrix .expense-total th, .category-matrix .expense-total td { background: #fdf8f5; color: var(--orange); font-weight: 700; }
+.category-matrix .balance th, .category-matrix .balance td { background: #f7f8f5; font-weight: 700; }
+.category-matrix .cumulative-balance th, .category-matrix .cumulative-balance td { background: #eff4ef; font-weight: 700; }
+.matrix-amount-button { padding: 3px 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
+.matrix-amount-button:hover { color: var(--green); text-decoration: underline; }
+.matrix-amount-button:focus-visible, .matrix-breakdown-record:focus-visible { outline: 2px solid #8fc19c; outline-offset: 2px; }
+.matrix-breakdown-viewer { position: fixed; inset: 0; z-index: 1001; display: grid; place-items: center; padding: 16px; background: #121713bb; backdrop-filter: blur(3px); }
+.matrix-breakdown-card { width: min(100%, 520px); max-height: 90dvh; overflow-y: auto; padding: 22px; border: 1px solid #e9ebe6; border-radius: 16px; background: white; color: var(--ink); box-shadow: 0 20px 70px #0003; }
+.matrix-breakdown-records { display: grid; }
+.matrix-breakdown-record { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 50px; padding: 10px 2px; border: 0; border-top: 1px solid #f0f1ed; background: transparent; color: #4c574f; text-align: left; font: inherit; font-size: 11px; cursor: pointer; }
+.matrix-breakdown-record span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.matrix-breakdown-record strong { white-space: nowrap; }
 .entry-panel { margin-top: 13px; }
 .entry-panel .panel-heading { margin-bottom: 14px; }
 .cancel-edit-button { border: 1px solid #dfe5df; border-radius: 8px; padding: 8px 11px; background: white; color: #68756b; font: inherit; font-size: 11px; cursor: pointer; }
@@ -185,6 +213,14 @@ select { appearance: none; border: 1px solid #e5e6df; background: white; border-
   .dashboard-toolbar { flex-wrap: wrap; gap: 8px; margin: 0 0 11px; }
   .loaded-file { width: 100%; flex-basis: 100%; margin-bottom: 3px; }
   .month-picker-label { margin-right: auto; }
+  .matrix-panel { margin-bottom: 10px; padding: 16px 12px 12px; }
+  .matrix-heading { flex-wrap: wrap; }
+  .matrix-heading h2 { font-size: 15px; }
+  .matrix-heading label { margin-left: 0; }
+  .matrix-scroll { max-height: 58vh; }
+  .category-matrix th, .category-matrix td { min-width: 91px; height: 41px; padding: 6px 7px; font-size: 9px; }
+  .category-matrix .matrix-label-cell { width: 125px; min-width: 125px; max-width: 125px; }
+  .matrix-amount-button { font-size: 9px; }
   .summary-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
   .entry-panel { margin-top: 10px; }
   .record-form { grid-template-columns: 1fr 1fr; gap: 11px 9px; }

@@ -8,6 +8,9 @@ const emptyState = document.querySelector("#empty-state");
 const dashboard = document.querySelector("#dashboard");
 const errorBox = document.querySelector("#load-error");
 const monthPicker = document.querySelector("#month-picker");
+const matrixYearPicker = document.querySelector("#matrix-year-picker");
+const matrixBreakdownViewer = document.querySelector("#matrix-breakdown-viewer");
+const matrixBreakdownRecords = document.querySelector("#matrix-breakdown-records");
 const recordForm = document.querySelector("#record-form");
 const recordTypePicker = document.querySelector("#record-type");
 const recordDateInput = document.querySelector("#record-date");
@@ -54,6 +57,8 @@ let pendingReceiptImage = null;
 let editingRecordId = null;
 let receiptViewerTrigger = null;
 let recordDetailTrigger = null;
+let matrixBreakdownTrigger = null;
+let matrixSelectedYear = null;
 let language = "ja";
 let currencySymbol = "¥";
 let moneyFormatter = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 0 });
@@ -76,6 +81,10 @@ fileInput.addEventListener("change", async () => {
 });
 
 monthPicker.addEventListener("change", renderMonth);
+matrixYearPicker.addEventListener("change", () => {
+  matrixSelectedYear = Number(matrixYearPicker.value) || null;
+  renderMatrix();
+});
 recordTypePicker.addEventListener("change", populateRecordCategories);
 recordForm.addEventListener("submit", saveRecord);
 document.querySelector("#cancel-edit-button").addEventListener("click", cancelRecordEdit);
@@ -83,6 +92,7 @@ document.querySelector("#export-backup-button").addEventListener("click", downlo
 receiptPhotoInput.addEventListener("change", updateReceiptPreview);
 document.querySelector("#close-receipt-viewer").addEventListener("click", closeReceiptViewer);
 document.querySelector("#close-record-detail").addEventListener("click", closeRecordDetail);
+document.querySelector("#close-matrix-breakdown").addEventListener("click", closeMatrixBreakdown);
 document.querySelector("#edit-record-button").addEventListener("click", () => {
   if (!editingRecordId) return;
   const recordId = editingRecordId;
@@ -101,9 +111,13 @@ receiptViewer.addEventListener("click", event => {
 recordDetailViewer.addEventListener("click", event => {
   if (event.target === recordDetailViewer) closeRecordDetail();
 });
+matrixBreakdownViewer.addEventListener("click", event => {
+  if (event.target === matrixBreakdownViewer) closeMatrixBreakdown();
+});
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !receiptViewer.hidden) closeReceiptViewer();
   else if (event.key === "Escape" && !recordDetailViewer.hidden) closeRecordDetail();
+  else if (event.key === "Escape" && !matrixBreakdownViewer.hidden) closeMatrixBreakdown();
 });
 
 window.addEventListener("DOMContentLoaded", initializeApp, { once: true });
@@ -133,6 +147,7 @@ function activateBackup(value, label, addedCount, hasChanges = Number(addedCount
   addedRecords = addedCount;
   hasWebChanges = hasChanges;
   editingRecordId = null;
+  matrixSelectedYear = null;
   language = value.settings?.language === "english" ? "en" : "ja";
   currencySymbol = typeof value.settings?.currencySymbol === "string" ? value.settings.currencySymbol : "¥";
   moneyFormatter = new Intl.NumberFormat(language === "ja" ? "ja-JP" : "en-US", {
@@ -154,6 +169,7 @@ function activateBackup(value, label, addedCount, hasChanges = Number(addedCount
   populateRecordCategories();
   setDefaultRecordDate();
   renderMonth();
+  renderMatrix();
 }
 
 function openInitialSetup() {
@@ -489,6 +505,7 @@ async function saveRecord(event) {
   populateMonths();
   monthPicker.value = periodKey(recordDate);
   renderMonth();
+  renderMatrix();
   recordTypePicker.value = "expense";
   populateRecordCategories();
   setDefaultRecordDate();
@@ -660,6 +677,215 @@ function renderMonth() {
   renderCategories(expenses, expenseTotal);
   renderRecords(records);
   renderReport(selectedMonth);
+}
+
+function renderMatrix() {
+  if (!backup) return;
+  const table = document.querySelector("#category-matrix");
+  const empty = document.querySelector("#matrix-empty");
+  const scroll = document.querySelector("#matrix-scroll");
+  const allPeriods = makeMatrixPeriods();
+  const availableYears = [...new Set(allPeriods.map(period => period.year))].sort((a, b) => b - a);
+
+  matrixYearPicker.replaceChildren();
+  if (availableYears.length === 0) {
+    matrixYearPicker.append(new Option(language === "ja" ? "記録なし" : "No records", ""));
+    matrixYearPicker.disabled = true;
+    matrixSelectedYear = null;
+    table.replaceChildren();
+    scroll.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+
+  matrixYearPicker.disabled = false;
+  if (!availableYears.includes(matrixSelectedYear)) matrixSelectedYear = availableYears[0];
+  availableYears.forEach(year => matrixYearPicker.append(new Option(String(year), String(year))));
+  matrixYearPicker.value = String(matrixSelectedYear);
+  const displayPeriods = allPeriods.filter(period => period.year === matrixSelectedYear);
+  empty.hidden = true;
+  scroll.hidden = false;
+
+  const recordsByPeriod = new Map(allPeriods.map(period => [period.key, []]));
+  backup.records.forEach(record => {
+    const date = dateFromBackup(record.date);
+    const key = date ? periodKey(date) : null;
+    if (key && recordsByPeriod.has(key)) recordsByPeriod.get(key).push({ record, date });
+  });
+
+  const categoriesById = new Map(backup.categories.map(category => [category.id, category]));
+  const rows = [];
+  for (const type of ["income", "expense"]) {
+    const categoryGroups = new Map();
+    allPeriods.forEach(period => {
+      (recordsByPeriod.get(period.key) || []).forEach(({ record }) => {
+        if (record.type !== type) return;
+        const group = categoryGroups.get(record.categoryId) || {
+          amountByPeriod: new Map(allPeriods.map(item => [item.key, 0])), total: 0, record
+        };
+        const amount = Number(record.amount) || 0;
+        group.amountByPeriod.set(period.key, (group.amountByPeriod.get(period.key) || 0) + amount);
+        group.total += amount;
+        categoryGroups.set(record.categoryId, group);
+      });
+    });
+
+    const categoryRows = [...categoryGroups.entries()]
+      .filter(([, group]) => group.total > 0)
+      .map(([categoryId, group]) => {
+        const category = categoriesById.get(categoryId);
+        const name = category?.localizedNames?.[language]
+          || category?.localizedNames?.ja
+          || category?.localizedNames?.en
+          || group.record.categoryNameSnapshot
+          || (language === "ja" ? "その他" : "Other");
+        return {
+          title: name,
+          kind: `${type}-category`,
+          categoryId,
+          amounts: group.amountByPeriod,
+          sortOrder: category?.sortOrder ?? Number.MAX_SAFE_INTEGER,
+          total: group.total
+        };
+      })
+      .sort((a, b) => a.sortOrder - b.sortOrder || b.total - a.total);
+
+    rows.push({ title: type === "income" ? "収入" : "支出", kind: `${type}-section` });
+    rows.push(...categoryRows);
+    const totalByPeriod = new Map(allPeriods.map(period => [period.key,
+      (recordsByPeriod.get(period.key) || [])
+        .filter(item => item.record.type === type)
+        .reduce((total, item) => total + (Number(item.record.amount) || 0), 0)
+    ]));
+    rows.push({ title: type === "income" ? "収入合計" : "支出合計", kind: `${type}-total`, amounts: totalByPeriod });
+  }
+
+  const monthlyBalance = new Map();
+  const cumulativeBalance = new Map();
+  let carryOver = Number(backup.settings?.initialCarryOver) || 0;
+  allPeriods.forEach(period => {
+    const periodRecords = recordsByPeriod.get(period.key) || [];
+    const income = periodRecords.filter(item => item.record.type === "income")
+      .reduce((total, item) => total + (Number(item.record.amount) || 0), 0);
+    const expense = periodRecords.filter(item => item.record.type === "expense")
+      .reduce((total, item) => total + (Number(item.record.amount) || 0), 0);
+    const balance = income - expense;
+    monthlyBalance.set(period.key, balance);
+    carryOver += balance;
+    cumulativeBalance.set(period.key, carryOver);
+  });
+  rows.push({ title: "単月収支", kind: "balance", amounts: monthlyBalance });
+  rows.push({ title: "累積収支（貯蓄）", kind: "cumulative-balance", amounts: cumulativeBalance });
+
+  table.replaceChildren();
+  const head = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  const itemHeader = document.createElement("th");
+  itemHeader.className = "matrix-label-cell";
+  itemHeader.scope = "col";
+  itemHeader.textContent = language === "ja" ? "項目" : "Item";
+  headerRow.append(itemHeader);
+  displayPeriods.forEach(period => {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = language === "ja" ? `${period.month}月` : new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(period.year, period.month - 1, 1));
+    headerRow.append(cell);
+  });
+  head.append(headerRow);
+  table.append(head);
+
+  const body = document.createElement("tbody");
+  rows.forEach(row => {
+    const tableRow = document.createElement("tr");
+    tableRow.className = `matrix-row ${row.kind}`;
+    const label = document.createElement("th");
+    label.scope = "row";
+    label.className = "matrix-label-cell";
+    label.textContent = row.title;
+    tableRow.append(label);
+
+    displayPeriods.forEach(period => {
+      const cell = document.createElement("td");
+      const amount = row.amounts?.get(period.key);
+      if (row.kind.endsWith("-section")) {
+        cell.textContent = "";
+      } else if (amount === undefined) {
+        cell.textContent = "";
+      } else if (row.categoryId && amount > 0) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "matrix-amount-button";
+        button.textContent = formatMoney(amount);
+        button.setAttribute("aria-label", `${period.year}年${period.month}月 ${row.title} ${formatMoney(amount)}の記録を表示`);
+        button.addEventListener("click", () => openMatrixBreakdown(period, row, button));
+        cell.append(button);
+      } else {
+        cell.textContent = row.categoryId ? "–" : formatMoney(amount);
+      }
+      tableRow.append(cell);
+    });
+    body.append(tableRow);
+  });
+  table.append(body);
+}
+
+function makeMatrixPeriods() {
+  const dates = backup.records.map(record => dateFromBackup(record.date)).filter(Boolean);
+  if (dates.length === 0) return [];
+  const firstKey = periodKey(new Date(Math.min(...dates.map(date => date.getTime()))));
+  const lastKey = periodKey(new Date());
+  const [firstYear, firstMonth] = firstKey.split("-").map(Number);
+  const [lastYear, lastMonth] = lastKey.split("-").map(Number);
+  const periods = [];
+  let cursor = new Date(firstYear, firstMonth - 1, 1);
+  const last = new Date(lastYear, lastMonth - 1, 1);
+  while (cursor <= last) {
+    periods.push({
+      key: monthKey(cursor),
+      year: cursor.getFullYear(),
+      month: cursor.getMonth() + 1
+    });
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+  return periods;
+}
+
+function openMatrixBreakdown(period, row, trigger) {
+  const items = (backup.records || [])
+    .map(record => ({ record, date: dateFromBackup(record.date) }))
+    .filter(item => item.date && periodKey(item.date) === period.key
+      && item.record.type === (row.kind === "income-category" ? "income" : "expense")
+      && item.record.categoryId === row.categoryId)
+    .sort((a, b) => b.date - a.date);
+  const title = document.querySelector("#matrix-breakdown-title");
+  title.textContent = `${period.year}年${period.month}月 · ${row.title}`;
+  matrixBreakdownRecords.replaceChildren();
+  items.forEach(({ record, date }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "matrix-breakdown-record";
+    const name = document.createElement("span");
+    name.textContent = `${dateLabel(date)} · ${record.memo?.trim() || row.title}`;
+    const amount = document.createElement("strong");
+    amount.textContent = formatMoney(record.amount);
+    button.append(name, amount);
+    button.addEventListener("click", () => {
+      closeMatrixBreakdown(false);
+      openRecordDetail(record, date, button);
+    });
+    matrixBreakdownRecords.append(button);
+  });
+  matrixBreakdownTrigger = trigger;
+  matrixBreakdownViewer.hidden = false;
+  document.body.style.overflow = "hidden";
+  document.querySelector("#close-matrix-breakdown").focus();
+}
+
+function closeMatrixBreakdown(restoreFocus = true) {
+  matrixBreakdownViewer.hidden = true;
+  document.body.style.overflow = "";
+  if (restoreFocus && matrixBreakdownTrigger?.isConnected) matrixBreakdownTrigger.focus();
+  matrixBreakdownTrigger = null;
 }
 
 function sum(items) {
